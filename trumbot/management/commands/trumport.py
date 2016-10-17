@@ -16,7 +16,6 @@ REQUEST_SETTINGS = {
 }
 
 URL = "https://api.twitter.com/1.1/statuses/user_timeline.json?%s"
-# count=200&trim_user=true&exclude_replies=false&include_rts=false&user_id=25073877"
 
 
 def oauth_request(url):
@@ -44,13 +43,23 @@ class Command(BaseCommand):
         data = json.loads(oauth_request(self._get_request(**REQUEST_SETTINGS)).decode())
 
         created_count = 0
-        total_count = len(data)
-        for i, tweet in enumerate(data):
-            print("Processing tweets %d / %d" % (i + 1, total_count))
-            text = tweet["text"].replace("\\n", "\n")
-            user = tweet["user"]["id"]
-            pk = tweet["id"]
-            tweet, created = Tweet.objects.get_or_create(text=text, user=user, pk=pk)
-            if created:
-                created_count += 1
+        total_count = 0
+        enumerations = 0
+        while(len(data) > 0 and enumerations < 180):
+            total_count += len(data)
+            enumerations += 1
+            for i, tweet in enumerate(data):
+                print("Processing tweets %d / %d" % (i + 1, total_count))
+                text = tweet["text"].replace("\\n", "\n")
+                user = tweet["user"]["id"]
+                pk = tweet["id"]
+                tweet, created = Tweet.objects.get_or_create(text=text, user=user, pk=pk)
+                if created:
+                    created_count += 1
+
+            oldest_pk = Tweet.objects.all().order_by("pk").first().pk
+            arguments = REQUEST_SETTINGS
+            arguments["max_id"] = oldest_pk
+            data = json.loads(oauth_request(self._get_request(**REQUEST_SETTINGS)).decode())
+
         print("%d tweets created" % created_count)
